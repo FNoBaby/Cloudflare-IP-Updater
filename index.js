@@ -77,9 +77,9 @@ async function checkAndUpdateAllRecords() {
     }
 }
 
-// Schedule the task to run once a day at midnight in Europe/Berlin timezone regardless of DST changes
-console.log('Setting up cron job to run IP update check once per day at midnight in Europe/Berlin timezone');
-cron.schedule('0 0 * * *', () => {
+// Schedule the task to run every 15 minutes regardless of DST changes
+console.log('Setting up cron job to run IP update check every 15 minutes in Europe/Berlin timezone');
+cron.schedule('*/15 * * * *', () => {
     console.log('Running scheduled IP update check...');
     checkAndUpdateAllRecords()
         .catch(err => console.error('Error in scheduled update:', err));
