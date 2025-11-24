@@ -52,6 +52,21 @@ See `.env.example` for a complete template.
 
 ## Usage
 
+### Clone the repository
+
+Clone this repository locally and change into the project directory:
+
+```shell
+git clone https://github.com/FNoBaby/Cloudflare-IP-Updater.git
+cd Cloudflare-IP-Updater
+```
+
+You can also use your SSH URL if you prefer:
+
+```shell
+git clone git@github.com:FNoBaby/Cloudflare-IP-Updater.git
+```
+
 ### Using Docker Compose (Recommended)
 
 1.  Clone the repository
