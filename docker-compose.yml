@@ -1,0 +1,11 @@
+services:
+  cloudflare-ip-updater:
+    build: .
+    container_name: cloudflare-ip-updater
+    restart: unless-stopped
+    environment:
+      - CLOUDFLARE_ZONE_ID=${CLOUDFLARE_ZONE_ID}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+    # Alternatively, use env_file to load from .env
+    # env_file:
+    #   - .env
