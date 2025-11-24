@@ -7,9 +7,105 @@ const cron = require('node-cron');
 dotenv.config();
 
 // Cloudflare API settings from environment variables
-const ZONE_ID = process.env.CLOUDFLARE_ZONE_ID;  // Cloudflare Zone ID for fnobaby.dev
+const ZONE_ID = process.env.CLOUDFLARE_ZONE_ID;  // Cloudflare Zone ID
 const API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;  // Cloudflare API Token
-const DOMAIN = "fnobaby.dev";  // Your main domain
+const DOMAIN = process.env.DOMAIN;  // Your main domain
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;  // Discord webhook URL for notifications
+
+// Function to send Discord webhook messages
+async function sendDiscordMessage(content) {
+    if (!DISCORD_WEBHOOK_URL) {
+        return; // Skip if no webhook URL is configured
+    }
+    
+    try {
+        await axios.post(DISCORD_WEBHOOK_URL, {
+            content: content
+        });
+    } catch (error) {
+        console.error('Error sending Discord message:', error.message);
+    }
+}
+
+// Function to send paginated Discord embeds for IP updates
+async function sendDiscordEmbeds(updates) {
+    if (!DISCORD_WEBHOOK_URL || updates.length === 0) {
+        return; // Skip if no webhook URL is configured or no updates
+    }
+    
+    try {
+        // Create embeds with pagination (10 records per page)
+        const embedsPerPage = 10;
+        const totalPages = Math.ceil(updates.length / embedsPerPage);
+        
+        for (let page = 0; page < totalPages; page++) {
+            const startIdx = page * embedsPerPage;
+            const endIdx = Math.min(startIdx + embedsPerPage, updates.length);
+            const pageUpdates = updates.slice(startIdx, endIdx);
+            
+            const fields = pageUpdates.map(update => ({
+                name: update.recordName,
+                value: `${update.oldIP} → ${update.newIP}`,
+                inline: false
+            }));
+            
+            const embed = {
+                title: `IP Address Updates (Page ${page + 1}/${totalPages})`,
+                description: `Updated ${updates.length} DNS record(s)`,
+                color: 0x00ff00, // Green color
+                fields: fields,
+                timestamp: new Date().toISOString(),
+                footer: {
+                    text: 'Cloudflare IP Updater'
+                }
+            };
+            
+            await axios.post(DISCORD_WEBHOOK_URL, {
+                embeds: [embed]
+            });
+            
+            // Add a small delay between pages to avoid rate limiting
+            if (page < totalPages - 1) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+    } catch (error) {
+        console.error('Error sending Discord embeds:', error.message);
+    }
+}
+
+// Function to send error messages to Discord
+async function sendDiscordError(errorMessage, errorDetails = '') {
+    if (!DISCORD_WEBHOOK_URL) {
+        return; // Skip if no webhook URL is configured
+    }
+    
+    try {
+        const embed = {
+            title: '❌ Error in Cloudflare IP Updater',
+            description: errorMessage,
+            color: 0xff0000, // Red color
+            timestamp: new Date().toISOString(),
+            footer: {
+                text: 'Cloudflare IP Updater'
+            }
+        };
+        
+        if (errorDetails) {
+            embed.fields = [{
+                name: 'Details',
+                value: errorDetails.substring(0, 1024), // Discord field value limit
+                inline: false
+            }];
+        }
+        
+        await axios.post(DISCORD_WEBHOOK_URL, {
+            embeds: [embed]
+        });
+    } catch (error) {
+        console.error('Error sending Discord error notification:', error.message);
+    }
+}
 
 // Function to get current public IP address
 async function getCurrentIP() {
@@ -18,6 +114,7 @@ async function getCurrentIP() {
         return response.data.trim();
     } catch (error) {
         console.error('Error getting current IP:', error);
+        await sendDiscordError('Failed to get current IP address', error.message);
         process.exit(1);
     }
 }
@@ -34,6 +131,7 @@ async function getAllDNSRecords() {
         return response.data.result;  // Returning DNS records
     } catch (error) {
         console.error('Error fetching DNS records from Cloudflare:', error);
+        await sendDiscordError('Failed to fetch DNS records from Cloudflare', error.message);
         process.exit(1);
     }
 }
@@ -56,6 +154,7 @@ async function updateDNSRecord(recordId, newIP, recordName) {
         console.log(`Updated DNS record ${recordName} (${recordId}) to IP: ${newIP}`);
     } catch (error) {
         console.error(`Error updating DNS record ${recordId} (${recordName}):`, error);
+        await sendDiscordError(`Failed to update DNS record: ${recordName}`, error.message);
     }
 }
 
@@ -63,6 +162,8 @@ async function updateDNSRecord(recordId, newIP, recordName) {
 async function checkAndUpdateAllRecords() {
     const currentIP = await getCurrentIP();
     const dnsRecords = await getAllDNSRecords();
+    
+    const updates = []; // Track all updates for Discord notification
 
     // Loop through all DNS records and update A records
     for (const record of dnsRecords) {
@@ -70,10 +171,20 @@ async function checkAndUpdateAllRecords() {
             if (record.content !== currentIP) {
                 console.log(`IP has changed for ${record.name}: ${record.content} => ${currentIP}`);
                 await updateDNSRecord(record.id, currentIP, record.name);
+                updates.push({
+                    recordName: record.name,
+                    oldIP: record.content,
+                    newIP: currentIP
+                });
             } else {
                 console.log(`No change for ${record.name}, IP is already correct.`);
             }
         }
+    }
+    
+    // Send Discord notification if there were any updates
+    if (updates.length > 0) {
+        await sendDiscordEmbeds(updates);
     }
 }
 
@@ -82,7 +193,10 @@ console.log('Setting up cron job to run IP update check every 15 minutes in Euro
 cron.schedule('*/15 * * * *', () => {
     console.log('Running scheduled IP update check...');
     checkAndUpdateAllRecords()
-        .catch(err => console.error('Error in scheduled update:', err));
+        .catch(err => {
+            console.error('Error in scheduled update:', err);
+            sendDiscordError('Error in scheduled update', err.message);
+        });
 }, {
     scheduled: true,
     timezone: "Europe/Berlin" // This will automatically handle DST changes
@@ -91,4 +205,7 @@ cron.schedule('*/15 * * * *', () => {
 // Run the script immediately on startup
 console.log('Running initial IP update check...');
 checkAndUpdateAllRecords()
-    .catch(err => console.error('Error in initial update:', err));
+    .catch(err => {
+        console.error('Error in initial update:', err);
+        sendDiscordError('Error in initial update', err.message);
+    });
