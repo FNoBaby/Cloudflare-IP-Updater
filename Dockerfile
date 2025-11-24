@@ -1,14 +1,12 @@
-# Use Node.js 20 Alpine as the base image for a lightweight container
-FROM node:20-alpine
+FROM node:18-alpine
 
-# Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci --only=production
 
 # Copy application files
 COPY index.js ./

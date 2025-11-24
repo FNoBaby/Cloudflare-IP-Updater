@@ -1,201 +1,113 @@
 # Cloudflare IP Updater
 
-A lightweight Node.js application that automatically updates your Cloudflare DNS A records with your current public IP address. Perfect for dynamic IP addresses or home server setups.
+Automatically updates Cloudflare DNS A records with your current public IP address. Runs as a scheduled task every 15 minutes.
 
 ## Features
 
-- 🔄 Automatically updates all A records in your Cloudflare zone
-- ⏰ Runs every 15 minutes via cron schedule
-- 🐳 Docker support with Alpine Linux for minimal footprint
-- 🌍 Timezone-aware (Europe/Berlin by default)
-- 🚀 Updates on startup and scheduled intervals
-- 📝 Detailed logging for all operations
+- 🔄 Automatic IP detection and DNS record updates
+- ⏰ Scheduled checks every 15 minutes
+- 🐳 Docker and Docker Compose support
+- 📬 Discord webhook notifications
+- 🌍 Timezone-aware (Europe/Berlin)
+- 🔒 Secure API token authentication
 
-## Prerequisites
+## Discord Notifications
 
-- A Cloudflare account with a domain
-- Cloudflare API Token with DNS edit permissions
-- Cloudflare Zone ID for your domain
-- Docker and Docker Compose (for Docker setup) OR Node.js (for local setup)
+When configured, the application sends Discord webhook notifications for:
 
-## Configuration
+- **IP Updates**: Paginated embeds showing old IP → new IP for all updated records (10 per page)
+- **Errors**: Detailed error notifications with error descriptions
 
-### Getting Your Cloudflare Credentials
+## Environment Variables
 
-1. **API Token**: 
-   - Go to [Cloudflare Dashboard](https://dash.cloudflare.com/profile/api-tokens)
-   - Click "Create Token"
-   - Use the "Edit zone DNS" template or create a custom token with `Zone.DNS` permissions
-   - Copy the generated token
-
-2. **Zone ID**:
-   - Go to your domain's overview page in Cloudflare Dashboard
-   - Scroll down to find your Zone ID in the right sidebar
-   - Copy the Zone ID
-
-### Environment Variables
-
-Create a `.env` file in the project root (you can copy from `.env.example`):
-
-```bash
-cp .env.example .env
-```
-
-Then edit `.env` with your credentials:
+Create a `.env` file in the project root with the following variables:
 
 ```env
+# Cloudflare API Configuration (Required)
 CLOUDFLARE_ZONE_ID=your_zone_id_here
 CLOUDFLARE_API_TOKEN=your_api_token_here
+
+# Domain Configuration (Required)
+DOMAIN=your_domain_here
+
+# Discord Webhook Configuration (Optional)
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your_webhook_url
 ```
 
-**Important**: Never commit your `.env` file to version control!
+See `.env.example` for a template.
 
-## Setup & Usage
+## Usage
 
-### Option 1: Docker (Recommended)
+### Using Docker Compose (Recommended)
 
-#### Using Docker Compose
-
-1. Clone the repository:
-```bash
-git clone https://github.com/FNoBaby/Cloudflare-IP-Updater.git
-cd Cloudflare-IP-Updater
-```
-
-2. Create your `.env` file with your Cloudflare credentials (see Configuration section above)
-
+1. Clone the repository
+2. Create your `.env` file with the required variables
 3. Build and start the container:
+
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 4. View logs:
+
 ```bash
-docker-compose logs -f
+docker compose logs -f
 ```
 
-5. Stop the container:
-```bash
-docker-compose down
-```
-
-#### Using Docker CLI
+### Using Docker
 
 1. Build the image:
+
 ```bash
 docker build -t cloudflare-ip-updater .
 ```
 
 2. Run the container:
+
 ```bash
 docker run -d \
   --name cloudflare-ip-updater \
   --restart unless-stopped \
-  -e CLOUDFLARE_ZONE_ID=your_zone_id_here \
-  -e CLOUDFLARE_API_TOKEN=your_api_token_here \
+  -e CLOUDFLARE_ZONE_ID=your_zone_id \
+  -e CLOUDFLARE_API_TOKEN=your_token \
+  -e DOMAIN=your_domain \
+  -e DISCORD_WEBHOOK_URL=your_webhook_url \
   cloudflare-ip-updater
 ```
 
-3. View logs:
-```bash
-docker logs -f cloudflare-ip-updater
-```
+### Using Node.js
 
-4. Stop the container:
-```bash
-docker stop cloudflare-ip-updater
-docker rm cloudflare-ip-updater
-```
+1. Install dependencies:
 
-### Option 2: Local Node.js Setup
-
-1. Clone the repository:
-```bash
-git clone https://github.com/FNoBaby/Cloudflare-IP-Updater.git
-cd Cloudflare-IP-Updater
-```
-
-2. Install dependencies:
 ```bash
 npm install
 ```
 
-3. Create your `.env` file with your Cloudflare credentials (see Configuration section above)
+2. Create your `.env` file
+3. Start the application:
 
-4. Run the application:
 ```bash
 npm start
 ```
 
-Or using Node directly:
-```bash
-node index.js
-```
-
 ## How It Works
 
-1. **On Startup**: The application immediately checks your current public IP and updates all A records if needed
-2. **Scheduled Updates**: Every 15 minutes, the application:
-   - Fetches your current public IP address from `ipv4.icanhazip.com`
-   - Retrieves all DNS records from your Cloudflare zone
-   - Compares each A record's IP with your current IP
-   - Updates any A records that don't match your current IP
-   - Logs all operations to the console
+1. On startup and every 15 minutes, the application:
+   - Fetches your current public IP address
+   - Retrieves all DNS A records from your Cloudflare zone
+   - Compares each record's IP with your current IP
+   - Updates any records that don't match
+   - Sends Discord notifications (if configured) for updates or errors
 
-## Customization
+2. The application runs continuously and handles DST changes automatically using the Europe/Berlin timezone
 
-### Change Update Interval
+## Discord Webhook Setup
 
-Edit the cron schedule in `index.js`:
-```javascript
-// Current: every 15 minutes
-cron.schedule('*/15 * * * *', ...
-
-// Every 5 minutes
-cron.schedule('*/5 * * * *', ...
-
-// Every hour
-cron.schedule('0 * * * *', ...
-```
-
-### Change Timezone
-
-Edit the timezone in `index.js`:
-```javascript
-cron.schedule('*/15 * * * *', () => {
-    // ...
-}, {
-    timezone: "America/New_York"  // Change to your timezone
-});
-```
-
-### Enable Cloudflare Proxy
-
-To enable Cloudflare's proxy (orange cloud), edit `index.js`:
-```javascript
-proxied: true  // Change from false to true in updateDNSRecord function
-```
-
-## Troubleshooting
-
-**Container won't start?**
-- Check your `.env` file exists and contains valid credentials
-- Verify your API token has DNS edit permissions
-- Check logs: `docker-compose logs` or `docker logs cloudflare-ip-updater`
-
-**IP not updating?**
-- Verify your Zone ID is correct
-- Ensure your API token has the right permissions
-- Check if your current IP has actually changed
-
-**DNS records not found?**
-- Verify the Zone ID matches your domain
-- Ensure you have A records in your Cloudflare DNS settings
+1. In your Discord server, go to Server Settings → Integrations → Webhooks
+2. Create a new webhook or select an existing one
+3. Copy the webhook URL
+4. Add it to your `.env` file as `DISCORD_WEBHOOK_URL`
 
 ## License
 
 ISC
-
-## Author
-
-FNoBaby
