@@ -12,6 +12,20 @@ const API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;  // Cloudflare API Token
 const DOMAIN = process.env.DOMAIN;  // Your main domain
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;  // Discord webhook URL for notifications
 
+// Discord webhook configuration constants
+const DISCORD_EMBEDS_PER_PAGE = 10;  // Number of records per Discord embed page
+const DISCORD_PAGE_DELAY_MS = 1000;  // Delay between pages to avoid rate limiting
+const DISCORD_FIELD_VALUE_LIMIT = 1024;  // Discord field value character limit
+
+// Validate required environment variables
+if (!ZONE_ID || !API_TOKEN || !DOMAIN) {
+    console.error('Error: Missing required environment variables');
+    if (!ZONE_ID) console.error('  - CLOUDFLARE_ZONE_ID is required');
+    if (!API_TOKEN) console.error('  - CLOUDFLARE_API_TOKEN is required');
+    if (!DOMAIN) console.error('  - DOMAIN is required');
+    process.exit(1);
+}
+
 // Function to send Discord webhook messages
 async function sendDiscordMessage(content) {
     if (!DISCORD_WEBHOOK_URL) {
@@ -34,13 +48,12 @@ async function sendDiscordEmbeds(updates) {
     }
     
     try {
-        // Create embeds with pagination (10 records per page)
-        const embedsPerPage = 10;
-        const totalPages = Math.ceil(updates.length / embedsPerPage);
+        // Create embeds with pagination
+        const totalPages = Math.ceil(updates.length / DISCORD_EMBEDS_PER_PAGE);
         
         for (let page = 0; page < totalPages; page++) {
-            const startIdx = page * embedsPerPage;
-            const endIdx = Math.min(startIdx + embedsPerPage, updates.length);
+            const startIdx = page * DISCORD_EMBEDS_PER_PAGE;
+            const endIdx = Math.min(startIdx + DISCORD_EMBEDS_PER_PAGE, updates.length);
             const pageUpdates = updates.slice(startIdx, endIdx);
             
             const fields = pageUpdates.map(update => ({
@@ -66,7 +79,7 @@ async function sendDiscordEmbeds(updates) {
             
             // Add a small delay between pages to avoid rate limiting
             if (page < totalPages - 1) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, DISCORD_PAGE_DELAY_MS));
             }
         }
     } catch (error) {
@@ -94,7 +107,7 @@ async function sendDiscordError(errorMessage, errorDetails = '') {
         if (errorDetails) {
             embed.fields = [{
                 name: 'Details',
-                value: errorDetails.substring(0, 1024), // Discord field value limit
+                value: errorDetails.substring(0, DISCORD_FIELD_VALUE_LIMIT), // Discord field value limit
                 inline: false
             }];
         }
