@@ -4,9 +4,7 @@ services:
     container_name: cloudflare-ip-updater
     restart: unless-stopped
     environment:
-      - CLOUDFLARE_ZONE_ID=${CLOUDFLARE_ZONE_ID}
-      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
-      - DOMAIN=${DOMAIN}
-      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
-    env_file:
-      - .env
+      - CLOUDFLARE_ZONE_ID=
+      - CLOUDFLARE_API_TOKEN=
+      - DOMAIN=
+      - DISCORD_WEBHOOK_URL=
