@@ -7,8 +7,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (retry once if first attempt fails)
-RUN npm install || npm install
+# Install dependencies
+RUN npm install
 
 # Copy application files
 COPY index.js ./
