@@ -1,6 +1,7 @@
 services:
-  cloudflare-ip-updater:
+  ddns:
     build: .
+    image: cloudflare-ip-updater:latest
     container_name: cloudflare-ip-updater
     restart: unless-stopped
     environment:

@@ -1,112 +1,135 @@
 # Cloudflare IP Updater
 
-Automatically updates Cloudflare DNS A records with your current public IP address. Runs as a scheduled task every 15 minutes.
+Automatically updates Cloudflare DNS A records with your current public
+IPv4 address. Runs as a scheduled task every 15 minutes.
 
 ## Features
 
-- 🔄 Automatic IP detection and DNS record updates
-- ⏰ Scheduled checks every 15 minutes
-- 🐳 Docker and Docker Compose support
-- 📬 Discord webhook notifications
-- 🌍 Timezone-aware (Europe/Berlin)
-- 🔒 Secure API token authentication
+- Automatic IPv4 detection and DNS record updates
+- Scheduled checks every 15 minutes
+- Docker and Docker Compose support
+- Optional Discord webhook notifications
+- Timezone-aware (Europe/Berlin)
+- Secure API token authentication
 
-## Discord Notifications
+## How It Works
 
-When configured, the application sends Discord webhook notifications for:
+On startup and every 15 minutes, the application:
 
-- **IP Updates**: Paginated embeds showing old IP → new IP for all updated records (10 per page)
-- **Errors**: Detailed error notifications with error descriptions
+1.  Fetches your current public IPv4 address
+2.  Retrieves all DNS records from your Cloudflare zone
+3.  Compares each A record's IP with your current IP
+4.  Updates any records that do not match
+5.  Sends Discord notifications for updates or errors (if configured)
+
+Only A records (IPv4) are updated. AAAA, CNAME, TXT, and other records
+are ignored.
+
+## Requirements
+
+### Cloudflare API Token Permissions
+
+The Cloudflare API token must include:
+
+- Zone → DNS → Read
+- Zone → DNS → Edit
 
 ## Environment Variables
 
-Create a `.env` file in the project root with the following variables:
+Create a `.env` file in the project root:
 
-```env
-# Cloudflare API Configuration (Required)
-CLOUDFLARE_ZONE_ID=your_zone_id_here
-CLOUDFLARE_API_TOKEN=your_api_token_here
+    # Cloudflare Configuration (Required)
+    CLOUDFLARE_ZONE_ID=your_zone_id_here
+    CLOUDFLARE_API_TOKEN=your_api_token_here
 
-# Domain Configuration (Required)
-DOMAIN=your_domain_here
+    # Domain Configuration (Required)
+    DOMAIN=your_domain_here
 
-# Discord Webhook Configuration (Optional)
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your_webhook_url
-```
+    # Discord Webhook (Optional)
+    DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your_webhook_url
 
-See `.env.example` for a template.
+See `.env.example` for a complete template.
 
 ## Usage
 
 ### Using Docker Compose (Recommended)
 
-1. Clone the repository
-2. Create your `.env` file with the required variables
-3. Build and start the container:
+1.  Clone the repository\
+2.  Create your `.env` file\
+3.  Start the service:
 
-```bash
+```shell
 docker compose up -d
 ```
 
-4. View logs:
+4.  View logs:
 
-```bash
+```shell
 docker compose logs -f
 ```
 
 ### Using Docker
 
-1. Build the image:
+1.  Build the image:
 
-```bash
+```shell
 docker build -t cloudflare-ip-updater .
 ```
 
-2. Run the container:
+2.  Run the container:
 
-```bash
-docker run -d \
-  --name cloudflare-ip-updater \
-  --restart unless-stopped \
-  -e CLOUDFLARE_ZONE_ID=your_zone_id \
-  -e CLOUDFLARE_API_TOKEN=your_token \
-  -e DOMAIN=your_domain \
-  -e DISCORD_WEBHOOK_URL=your_webhook_url \
-  cloudflare-ip-updater
+```shell
+  docker run -d   --name cloudflare-ip-updater   --restart unless-stopped   --env-file .env   cloudflare-ip-updater
 ```
 
 ### Using Node.js
 
-1. Install dependencies:
+1.  Install dependencies:
 
-```bash
+```shell
 npm install
 ```
 
-2. Create your `.env` file
-3. Start the application:
+2.  Start the application:
 
-```bash
+```shell
 npm start
 ```
 
-## How It Works
+## Discord Notifications
 
-1. On startup and every 15 minutes, the application:
-   - Fetches your current public IP address
-   - Retrieves all DNS A records from your Cloudflare zone
-   - Compares each record's IP with your current IP
-   - Updates any records that don't match
-   - Sends Discord notifications (if configured) for updates or errors
+If configured, the application sends:
 
-2. The application runs continuously and handles DST changes automatically using the Europe/Berlin timezone
+### IP Update Notifications
 
-## Discord Webhook Setup
+Paginated embeds showing: - Old IP → new IP - Record name\
+(10 records per page)
 
-1. In your Discord server, go to Server Settings → Integrations → Webhooks
-2. Create a new webhook or select an existing one
-3. Copy the webhook URL
-4. Add it to your `.env` file as `DISCORD_WEBHOOK_URL`
+### Error Notifications
+
+Includes: - Error message - Truncated error details (Discord-safe
+length)
+
+## Troubleshooting
+
+### Container image is large (\~180MB)
+
+Node 18 images are large by default.\
+Multi-stage or distroless Dockerfiles can significantly reduce size.
+
+### Discord notifications not appearing
+
+- Ensure `DISCORD_WEBHOOK_URL` is set
+- Check logs for webhook errors
+
+### Cron not running inside Docker
+
+Cron is handled entirely by `node-cron`; no OS cron is required.
+
+### Discord rate limiting
+
+The updater introduces a delay between embed pages to avoid hitting
+limits.
 
 ## License
 

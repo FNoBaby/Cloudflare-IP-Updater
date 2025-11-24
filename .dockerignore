@@ -1,4 +1,17 @@
-# Node modules
+node_modules
+npm-debug.log
+.env
+.git
+.github
+.vscode
+Dockerfile
+docker-compose.yml
+README.md
+*.md
+.DS_Store
+coverage
+dist
+build# Node modules
 node_modules/
 npm-debug.log
 
