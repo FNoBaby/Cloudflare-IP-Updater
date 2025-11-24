@@ -54,8 +54,8 @@ See `.env.example` for a complete template.
 
 ### Using Docker Compose (Recommended)
 
-1.  Clone the repository\
-2.  Create your `.env` file\
+1.  Clone the repository
+2.  Edit the env variables in the compose file (docker-compose.yml)
 3.  Start the service:
 
 ```shell
@@ -102,7 +102,7 @@ If configured, the application sends:
 
 ### IP Update Notifications
 
-Paginated embeds showing: - Old IP → new IP - Record name\
+Paginated embeds showing: - Old IP → new IP - Record name
 (10 records per page)
 
 ### Error Notifications
@@ -114,7 +114,7 @@ length)
 
 ### Container image is large (\~180MB)
 
-Node 18 images are large by default.\
+Node 18 images are large by default.
 Multi-stage or distroless Dockerfiles can significantly reduce size.
 
 ### Discord notifications not appearing
