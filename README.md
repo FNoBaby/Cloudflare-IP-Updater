@@ -20,7 +20,8 @@ On startup and every 15 minutes, the application:
 2.  Retrieves all DNS records from your Cloudflare zone
 3.  Compares each A record's IP with your current IP
 4.  Updates any records that do not match
-5.  Sends Discord notifications for updates or errors (if configured)
+5.  Applies `proxied: false` to records listed in `UNPROXIED_RECORDS`
+6.  Sends Discord notifications for updates or errors (if configured)
 
 Only A records (IPv4) are updated. AAAA, CNAME, TXT, and other records
 are ignored.
@@ -44,6 +45,10 @@ Create a `.env` file in the project root:
 
     # Domain Configuration (Required)
     DOMAIN=your_domain_here
+
+    # Optional: comma-separated list of records to keep unproxied (DNS-only)
+    # Accepts full names (home.example.com), short names (home), or root aliases (@, root)
+    UNPROXIED_RECORDS=home,vpn,@
 
     # Discord Webhook (Optional)
     DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your_webhook_url

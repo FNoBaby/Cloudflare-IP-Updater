@@ -8,4 +8,5 @@ services:
       - CLOUDFLARE_ZONE_ID=
       - CLOUDFLARE_API_TOKEN=
       - DOMAIN=
+      - UNPROXIED_RECORDS=
       - DISCORD_WEBHOOK_URL=

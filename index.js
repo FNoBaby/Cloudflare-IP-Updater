@@ -11,6 +11,7 @@ const ZONE_ID = process.env.CLOUDFLARE_ZONE_ID;  // Cloudflare Zone ID
 const API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;  // Cloudflare API Token
 const DOMAIN = process.env.DOMAIN;  // Your main domain
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;  // Discord webhook URL for notifications
+const UNPROXIED_RECORDS = process.env.UNPROXIED_RECORDS || '';  // Comma-separated list of records to keep unproxied
 
 // Discord webhook configuration constants
 const DISCORD_EMBEDS_PER_PAGE = 10;  // Number of records per Discord embed page
@@ -24,6 +25,48 @@ if (!ZONE_ID || !API_TOKEN || !DOMAIN) {
     if (!API_TOKEN) console.error('  - CLOUDFLARE_API_TOKEN is required');
     if (!DOMAIN) console.error('  - DOMAIN is required');
     process.exit(1);
+}
+
+// Parse comma-separated record names from env var
+const unproxiedRecordsSet = new Set(
+    UNPROXIED_RECORDS
+        .split(',')
+        .map(record => record.trim().toLowerCase())
+        .filter(Boolean)
+);
+
+function getNormalizedRecordAliases(recordName) {
+    const aliases = new Set();
+    const normalizedName = recordName.trim().toLowerCase();
+    const normalizedDomain = DOMAIN.trim().toLowerCase();
+
+    aliases.add(normalizedName);
+
+    // Support root record aliases for convenience
+    if (normalizedName === normalizedDomain) {
+        aliases.add('@');
+        aliases.add('root');
+    }
+
+    // Support short-name aliases like "home" for "home.example.com"
+    if (normalizedName.endsWith(`.${normalizedDomain}`)) {
+        const shortName = normalizedName.slice(0, -(normalizedDomain.length + 1));
+        if (shortName) {
+            aliases.add(shortName);
+        }
+    }
+
+    return aliases;
+}
+
+function isUnproxiedRecord(recordName) {
+    const aliases = getNormalizedRecordAliases(recordName);
+    for (const alias of aliases) {
+        if (unproxiedRecordsSet.has(alias)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Function to send Discord webhook messages
@@ -150,25 +193,31 @@ async function getAllDNSRecords() {
 }
 
 // Function to update a DNS record in Cloudflare
-async function updateDNSRecord(recordId, newIP, recordName) {
+async function updateDNSRecord(recordId, newIP, recordName, proxied = true) {
     try {
         const response = await axios.put(`https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records/${recordId}`, {
             type: 'A',
             name: recordName,
             content: newIP,
             ttl: 120,
-            proxied: false  // Set to true if you want Cloudflare's proxy to be enabled
+            proxied
         }, {
             headers: {
                 'Authorization': `Bearer ${API_TOKEN}`,
                 'Content-Type': 'application/json'
             }
         });
-        console.log(`Updated DNS record ${recordName} (${recordId}) to IP: ${newIP}`);
+        const proxyState = proxied ? 'proxied' : 'unproxied';
+        console.log(`Updated DNS record ${recordName} (${recordId}) to IP: ${newIP} (${proxyState})`);
     } catch (error) {
         console.error(`Error updating DNS record ${recordId} (${recordName}):`, error);
         await sendDiscordError(`Failed to update DNS record: ${recordName}`, error.message);
     }
+}
+
+// Dedicated updater for records that should stay DNS-only (unproxied)
+async function updateDNSRecordUnproxied(recordId, newIP, recordName) {
+    await updateDNSRecord(recordId, newIP, recordName, false);
 }
 
 // Main function to check and update IP for all A records
@@ -183,7 +232,11 @@ async function checkAndUpdateAllRecords() {
         if (record.type === 'A') {
             if (record.content !== currentIP) {
                 console.log(`IP has changed for ${record.name}: ${record.content} => ${currentIP}`);
-                await updateDNSRecord(record.id, currentIP, record.name);
+                if (isUnproxiedRecord(record.name)) {
+                    await updateDNSRecordUnproxied(record.id, currentIP, record.name);
+                } else {
+                    await updateDNSRecord(record.id, currentIP, record.name);
+                }
                 updates.push({
                     recordName: record.name,
                     oldIP: record.content,
